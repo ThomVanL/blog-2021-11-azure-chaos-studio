@@ -1,0 +1,395 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "yourIp": {
+            "defaultValue": "",
+            "type": "string",
+            "metadata": {
+                "description": "Your IP address, used to allow SSH access."
+            }
+        },
+        "virtualMachines_adminUsername": {
+            "type": "string",
+            "metadata": {
+                "description": "Linux VM admin username."
+            }
+        },
+        "virtualMachines_adminPassword": {
+            "type": "securestring",
+            "metadata": {
+                "description": "Linux VM admin password."
+            }
+
+        },
+        "virtualMachines_size": {
+            "defaultValue": "Standard_B1ls",
+            "type": "String",
+            "metadata": {
+                "description": "Linux VM SKU size."
+            }
+        },
+        "virtualMachines_name": {
+            "defaultValue": "tvl-azcs-vm",
+            "type": "String",
+            "metadata": {
+                "description": "Linux VM name."
+            }
+        },
+        "virtualNetwork_name": {
+            "defaultValue": "tvl-azcs-vnet",
+            "type": "String",
+            "metadata": {
+                "description": "Virtual network name."
+            }
+        },
+        "networkInterface_name": {
+            "defaultValue": "tvl-azcs-vmnic",
+            "type": "String",
+            "metadata": {
+                "description": "VM NIC name."
+            }
+        },
+        "publicIPAddress_ip_name": {
+            "defaultValue": "tvl-azcs-vmip",
+            "type": "String",
+            "metadata": {
+                "description": "Public IP address name."
+            }
+        },
+        "networkSecurityGroup_name": {
+            "defaultValue": "tvl-azcs-nsg",
+            "type": "String",
+            "metadata": {
+                "description": "Network security group name."
+            }
+        }
+    },
+    "variables": {
+        "webSubnetName": "web-sn",
+
+        "networkSecurityGroupChaosTargetName": "microsoft-networksecuritygroup",
+        "networkSecurityGroupChaosTargetResourceName": "[format('{0}/Microsoft.Chaos/{1}',parameters('networkSecurityGroup_name'), variables('networkSecurityGroupChaosTargetName'))]",
+        "networkSecurityGroupChaosTargetResourceId": "[resourceId('Microsoft.Network/networkSecurityGroups/providers/targets', parameters('networkSecurityGroup_name'),'Microsoft.Chaos',variables('networkSecurityGroupChaosTargetName'))]",
+
+        "networkSecurityGroupChaosTargetCapabilityName": "SecurityRule-1.0",
+        "networkSecurityGroupChaosTargetCapabilityResourceName": "[format('{0}/Microsoft.Chaos/{1}/{2}',parameters('networkSecurityGroup_name'), variables('networkSecurityGroupChaosTargetName'), variables('networkSecurityGroupChaosTargetCapabilityName'))]",
+        "networkSecurityGroupChaosTargetCapabilityResourceId": "[resourceId('Microsoft.Network/networkSecurityGroups/providers/targets/capabilities', parameters('networkSecurityGroup_name'),'Microsoft.Chaos',variables('networkSecurityGroupChaosTargetName'),variables('networkSecurityGroupChaosTargetCapabilityName'))]",
+
+        "networkContributorRoleDefinitionId": "[resourceId('Microsoft.Authorization/roleDefinitions', '4d97b98b-1d4f-4787-a291-c67834d212e7')]",
+        "experimentName": "tvl-azcs-blog-experiment",
+        "experimentNameRoleAssignmentName": "[guid(variables('experimentName'), variables('networkContributorRoleDefinitionId'), resourceGroup().id)]"
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Network/networkSecurityGroups/providers/targets",
+            "apiVersion": "2021-09-15-preview",
+            "name": "[variables('networkSecurityGroupChaosTargetResourceName')]",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('networkSecurityGroup_name'))]"
+            ],
+            "properties": {}
+        },
+        {
+            "type": "Microsoft.Network/networkSecurityGroups/providers/targets/capabilities",
+            "apiVersion": "2021-09-15-preview",
+            "name": "[variables('networkSecurityGroupChaosTargetCapabilityResourceName')]",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+                "[variables('networkSecurityGroupChaosTargetResourceId')]"
+            ],
+            "properties": {}
+        },
+        {
+            "type": "Microsoft.Chaos/experiments",
+            "apiVersion": "2021-09-15-preview",
+            "name": "[variables('experimentName')]",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+                "[variables('networkSecurityGroupChaosTargetCapabilityResourceId')]"
+            ],
+            "identity": {
+                "type": "SystemAssigned"
+            },
+            "properties": {
+                "startOnCreation": false,
+                "selectors": [
+                    {
+                        "type": "List",
+                        "id": "[guid(variables('networkSecurityGroupChaosTargetResourceId'))]",
+                        "targets": [
+                            {
+                                "id": "[variables('networkSecurityGroupChaosTargetResourceId')]",
+                                "type": "ChaosTarget"
+                            }
+                        ]
+                    }
+                ],
+                "steps": [
+                    {
+                        "name": "Change NSG inbound rules",
+                        "branches": [
+                            {
+                                "name": "Add deny web rule",
+                                "actions": [
+                                    {
+                                        "type": "continuous",
+                                        "selectorId": "[guid(variables('networkSecurityGroupChaosTargetResourceId'))]",
+                                        "duration": "PT5M",
+                                        "parameters": [
+                                            {
+                                                "key": "priority",
+                                                "value": "101"
+                                            },
+                                            {
+                                                "key": "direction",
+                                                "value": "Inbound"
+                                            },
+                                            {
+                                                "key": "sourceAddresses",
+                                                "value": "[format('[\"*\"]')]"
+                                            },
+                                            {
+                                                "key": "sourcePortRanges",
+                                                "value": "[format('[\"*\"]')]"
+                                            },
+                                            {
+                                                "key": "destinationAddresses",
+                                                "value": "[format('[\"*\"]')]"
+                                            },
+                                            {
+                                                "key": "destinationPortRanges",
+                                                "value": "[format('[\"80\",\"443\"]')]"
+                                            },
+                                            {
+                                                "key": "protocol",
+                                                "value": "Any"
+                                            },
+                                            {
+                                                "key": "action",
+                                                "value": "Deny"
+                                            },
+                                            {
+                                                "key": "name",
+                                                "value": "chaos-studio-deny-web"
+                                            }
+                                        ],
+                                        "name": "urn:csci:microsoft:networkSecurityGroup:securityRule/1.0"
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.Network/networkSecurityGroups",
+            "apiVersion": "2020-04-01",
+            "name": "[parameters('networkSecurityGroup_name')]",
+            "location": "[resourceGroup().location]",
+            "properties": {
+                "securityRules": [
+                    {
+                        "name": "default-allow-ssh",
+                        "properties": {
+                            "protocol": "TCP",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "22",
+                            "sourceAddressPrefix": "[parameters('yourIp')]",
+                            "destinationAddressPrefix": "*",
+                            "access": "Allow",
+                            "priority": 100,
+                            "direction": "Inbound"
+                        }
+                    },
+                    {
+                        "name": "default-allow-web",
+                        "properties": {
+                            "protocol": "*",
+                            "sourcePortRange": "*",
+                            "destinationPortRanges": [
+                                "80",
+                                "443"
+                            ],
+                            "sourceAddressPrefix": "*",
+                            "destinationAddressPrefix": "*",
+                            "access": "Allow",
+                            "priority": 200,
+                            "direction": "Inbound"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.Authorization/roleAssignments",
+            "apiVersion": "2021-04-01-preview",
+            "name": "[variables('experimentNameRoleAssignmentName')]",
+            "scope": "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('networkSecurityGroup_name'))]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Chaos/experiments', variables('experimentName'))]",
+                "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('networkSecurityGroup_name'))]"
+            ],
+            "properties": {
+                "roleDefinitionId": "[variables('networkContributorRoleDefinitionId')]",
+                "principalId": "[reference(resourceId('Microsoft.Chaos/experiments', variables('experimentName')),'2021-09-15-preview','full').identity.principalId]",
+                "principalType": "ServicePrincipal"
+            }
+        },
+
+        {
+            "type": "Microsoft.Network/publicIPAddresses",
+            "apiVersion": "2020-04-01",
+            "name": "[parameters('publicIPAddress_ip_name')]",
+            "location": "[resourceGroup().location]",
+            "sku": {
+                "name": "Standard"
+            },
+            "properties": {
+                "publicIPAllocationMethod": "Static",
+                "publicIPAddressVersion": "IPv4"
+            }
+        },
+        {
+            "type": "Microsoft.Network/virtualNetworks",
+            "apiVersion": "2020-04-01",
+            "name": "[parameters('virtualNetwork_name')]",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('networkSecurityGroup_name'))]"
+            ],
+            "properties": {
+                "addressSpace": {
+                    "addressPrefixes": [
+                        "10.0.0.0/24"
+                    ]
+                },
+                "subnets": [
+                    {
+                        "name": "[variables('webSubnetName')]",
+                        "properties": {
+                            "addressPrefix": "10.0.0.0/24",
+                            "networkSecurityGroup": {
+                                "id": "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('networkSecurityGroup_name'))]"
+                            }
+                        }
+
+                    }
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.Compute/virtualMachines",
+            "apiVersion": "2019-07-01",
+            "name": "[parameters('virtualMachines_name')]",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/networkInterfaces', parameters('networkInterface_name'))]"
+            ],
+            "properties": {
+                "hardwareProfile": {
+                    "vmSize": "[parameters('virtualMachines_size')]"
+                },
+                "storageProfile": {
+                    "imageReference": {
+                        "publisher": "canonical",
+                        "offer": "0001-com-ubuntu-server-focal",
+                        "sku": "20_04-lts",
+                        "version": "latest"
+                    },
+                    "osDisk": {
+                        "osType": "Linux",
+                        "name": "[concat(parameters('virtualMachines_name'), '-OsDisk-1')]",
+                        "createOption": "FromImage",
+                        "caching": "ReadWrite",
+                        "managedDisk": {
+                            "storageAccountType": "StandardSSD_LRS"
+                        },
+                        "diskSizeGB": 30
+                    }
+                },
+                "osProfile": {
+                    "computerName": "[parameters('virtualMachines_name')]",
+                    "adminUsername": "[parameters('virtualMachines_adminUsername')]",
+                    "adminPassword": "[parameters('virtualMachines_adminPassword')]",
+                    "linuxConfiguration": {
+                        "disablePasswordAuthentication": false
+                    }
+                },
+                "networkProfile": {
+                    "networkInterfaces": [
+                        {
+                            "id": "[resourceId('Microsoft.Network/networkInterfaces', parameters('networkInterface_name'))]"
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "name": "[concat(parameters('virtualMachines_name'),'/', 'setupscript')]",
+            "type": "Microsoft.Compute/virtualMachines/extensions",
+            "location": "[resourceGroup().location]",
+            "apiVersion": "2019-03-01",
+            "dependsOn": [
+                "[concat('Microsoft.Compute/virtualMachines/', concat(parameters('virtualMachines_name')))]"
+            ],
+            "properties": {
+                "publisher": "Microsoft.Azure.Extensions",
+                "type": "CustomScript",
+                "typeHandlerVersion": "2.1",
+                "autoUpgradeMinorVersion": true,
+                "settings": {
+                    "skipDos2Unix": false,
+                    "timestamp": 1
+                },
+                "protectedSettings": {
+                    "fileUris": [
+                        "https://raw.githubusercontent.com/ThomVanL/blog-2021-11-azure-chaos-studio/main/scripts/nginx-vm-setup/setup.sh"
+                    ],
+                    "commandToExecute": "sh setup.sh",
+                    "managedIdentity": {}
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Network/networkInterfaces",
+            "apiVersion": "2020-04-01",
+            "name": "[parameters('networkInterface_name')]",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/publicIPAddresses', parameters('publicIPAddress_ip_name'))]",
+                "[resourceId('Microsoft.Network/virtualNetworks', parameters('virtualNetwork_name'))]",
+                "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('networkSecurityGroup_name'))]"
+            ],
+            "properties": {
+                "ipConfigurations": [
+                    {
+                        "name": "ipconfig1",
+                        "properties": {
+                            "privateIPAllocationMethod": "Dynamic",
+                            "publicIPAddress": {
+                                "id": "[resourceId('Microsoft.Network/publicIPAddresses', parameters('publicIPAddress_ip_name'))]"
+                            },
+                            "subnet": {
+                                "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('virtualNetwork_name'), variables('webSubnetName'))]"
+                            },
+                            "primary": true
+                        }
+                    }
+                ]
+            }
+        }
+    ],
+    "outputs": {
+        "sshCommand": {
+            "type": "string",
+            "value": "[format('ssh {0}@{1}', parameters('virtualMachines_adminUsername'),reference(parameters('publicIPAddress_ip_name')).ipAddress)]"
+        },
+        "websiteUrl": {
+            "type": "string",
+            "value": "[format('http://{0}',reference(parameters('publicIPAddress_ip_name')).ipAddress)]"
+        }
+    }
+}

@@ -1,0 +1,33 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "yourIp": {
+            "value": ""
+        },
+        "virtualMachines_adminUsername": {
+            "value": ""
+        },
+        "virtualMachines_adminPassword": {
+            "value": ""
+        },
+        "virtualMachines_size": {
+            "value": "Standard_B1ls"
+        },
+        "virtualMachines_name": {
+            "value": "tvl-azcs-vm"
+        },
+        "virtualNetwork_name": {
+            "value": "tvl-azcs-vnet"
+        },
+        "networkInterface_name": {
+            "value": "tvl-azcs-vmnic"
+        },
+        "publicIPAddress_ip_name": {
+            "value": "tvl-azcs-vmip"
+        },
+        "networkSecurityGroup_name": {
+            "value": "tvl-azcs-nsg"
+        }
+    }
+}
