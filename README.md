@@ -14,14 +14,14 @@ I will create a simple web server, which will be sitting in a web subnet on the 
 
 Deploys resources required to follow along with my blog post demo.
 
-[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FThomVanL%2Fblog-2021-11-azure-chaos-studio%2Fmain%2Farm-templates%2Fstarter%2Fazuredeploy.json)
+[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FThomVanL%2Fblog-2021-11-azure-chaos-studio%2Farm-deploymentscripts%2Farm-templates%2Fstarter%2Fazuredeploy.json)
 
-[![Visualize](https://raw.githubusercontent.com/Azure/azure-quickstart-templates/master/1-CONTRIBUTION-GUIDE/images/visualizebutton.svg?sanitize=true)](http://armviz.io/#/?load=https%3A%2F%2Fraw.githubusercontent.com%2FThomVanL%2Fblog-2021-11-azure-chaos-studio%2Fmain%2Farm-templates%2Fstarter%2Fazuredeploy.json)
+[![Visualize](https://raw.githubusercontent.com/Azure/azure-quickstart-templates/master/1-CONTRIBUTION-GUIDE/images/visualizebutton.svg?sanitize=true)](http://armviz.io/#/?load=https%3A%2F%2Fraw.githubusercontent.com%2FThomVanL%2Fblog-2021-11-azure-chaos-studio%2Farm-deploymentscripts%2Farm-templates%2Fstarter%2Fazuredeploy.json)
 
 #### Complete template
 
 Deploys all the resources, as they appear at the end of the blog post demo.
 
-[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FThomVanL%2Fblog-2021-11-azure-chaos-studio%2Fmain%2Farm-templates%2Fcomplete%2Fazuredeploy.json)
+[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FThomVanL%2Fblog-2021-11-azure-chaos-studio%2Farm-deploymentscripts%2Farm-templates%2Fcomplete%2Fazuredeploy.json)
 
-[![Visualize](https://raw.githubusercontent.com/Azure/azure-quickstart-templates/master/1-CONTRIBUTION-GUIDE/images/visualizebutton.svg?sanitize=true)](http://armviz.io/#/?load=https%3A%2F%2Fraw.githubusercontent.com%2FThomVanL%2Fblog-2021-11-azure-chaos-studio%2Fmain%2Farm-templates%2Fcomplete%2Fazuredeploy.json)
+[![Visualize](https://raw.githubusercontent.com/Azure/azure-quickstart-templates/master/1-CONTRIBUTION-GUIDE/images/visualizebutton.svg?sanitize=true)](http://armviz.io/#/?load=https%3A%2F%2Fraw.githubusercontent.com%2FThomVanL%2Fblog-2021-11-azure-chaos-studio%2Farm-deploymentscripts%2Farm-templates%2Fcomplete%2Fazuredeploy.json)
