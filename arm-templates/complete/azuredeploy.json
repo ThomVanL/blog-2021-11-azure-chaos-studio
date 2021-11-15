@@ -63,18 +63,25 @@
             "metadata": {
                 "description": "Network security group name."
             }
+        },
+        "utcValue": {
+            "defaultValue": "[utcNow()]",
+            "type": "String",
+            "metadata": {
+                "description": "UTC value."
+            }
         }
     },
     "variables": {
         "webSubnetName": "web-sn",
 
-        "networkSecurityGroupChaosTargetName": "microsoft-networksecuritygroup",
-        "networkSecurityGroupChaosTargetResourceName": "[format('{0}/Microsoft.Chaos/{1}',parameters('networkSecurityGroup_name'), variables('networkSecurityGroupChaosTargetName'))]",
-        "networkSecurityGroupChaosTargetResourceId": "[resourceId('Microsoft.Network/networkSecurityGroups/providers/targets', parameters('networkSecurityGroup_name'),'Microsoft.Chaos',variables('networkSecurityGroupChaosTargetName'))]",
+        "waitroledefDeploymentScriptName": "tvl-azcs-wait-roledefinition-propagation-ds",
 
-        "networkSecurityGroupChaosTargetCapabilityName": "SecurityRule-1.0",
-        "networkSecurityGroupChaosTargetCapabilityResourceName": "[format('{0}/Microsoft.Chaos/{1}/{2}',parameters('networkSecurityGroup_name'), variables('networkSecurityGroupChaosTargetName'), variables('networkSecurityGroupChaosTargetCapabilityName'))]",
-        "networkSecurityGroupChaosTargetCapabilityResourceId": "[resourceId('Microsoft.Network/networkSecurityGroups/providers/targets/capabilities', parameters('networkSecurityGroup_name'),'Microsoft.Chaos',variables('networkSecurityGroupChaosTargetName'),variables('networkSecurityGroupChaosTargetCapabilityName'))]",
+        "azcsTargetsDeploymentScriptName": "tvl-azcs-enable-chaos-targets-ds",
+        "azcsTargetsDeploymentScriptIdentityName": "tvl-azcs-enable-chaos-targets-uai",
+        "azcsTargetsDeploymentScriptRoleName": "tvl-azcs-enable-chaos-targets-role",
+        "azcsTargetsDeploymentScriptRoleDefinitionName": "[guid(subscription().id, variables('azcsTargetsDeploymentScriptRoleName'),resourceGroup().id)]",
+        "azcsTargetsDeploymentScriptRoleAssignmentName": "[guid(variables('azcsTargetsDeploymentScriptIdentityName'), variables('azcsTargetsDeploymentScriptRoleDefinitionName'), resourceGroup().id)]",
 
         "networkContributorRoleDefinitionId": "[resourceId('Microsoft.Authorization/roleDefinitions', '4d97b98b-1d4f-4787-a291-c67834d212e7')]",
         "experimentName": "tvl-azcs-blog-experiment",
@@ -82,24 +89,97 @@
     },
     "resources": [
         {
-            "type": "Microsoft.Network/networkSecurityGroups/providers/targets",
-            "apiVersion": "2021-09-15-preview",
-            "name": "[variables('networkSecurityGroupChaosTargetResourceName')]",
-            "location": "[resourceGroup().location]",
-            "dependsOn": [
-                "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('networkSecurityGroup_name'))]"
-            ],
-            "properties": {}
+            "type": "Microsoft.ManagedIdentity/userAssignedIdentities",
+            "apiVersion": "2018-11-30",
+            "name": "[variables('azcsTargetsDeploymentScriptIdentityName')]",
+            "location": "[resourceGroup().location]"
         },
         {
-            "type": "Microsoft.Network/networkSecurityGroups/providers/targets/capabilities",
-            "apiVersion": "2021-09-15-preview",
-            "name": "[variables('networkSecurityGroupChaosTargetCapabilityResourceName')]",
-            "location": "[resourceGroup().location]",
+            "type": "Microsoft.Authorization/roleDefinitions",
+            "apiVersion": "2018-07-01",
+            "name": "[variables('azcsTargetsDeploymentScriptRoleDefinitionName')]",
             "dependsOn": [
-                "[variables('networkSecurityGroupChaosTargetResourceId')]"
+                "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('azcsTargetsDeploymentScriptIdentityName'))]"
             ],
-            "properties": {}
+            "properties": {
+                "type": "customRole",
+                "roleName": "[variables('azcsTargetsDeploymentScriptRoleName')]",
+                "description": "Configure least privilege for the deployment principal in deployment script",
+                "isCustom": true,
+                "permissions": [
+                    {
+                        "actions": [
+                            "Microsoft.Storage/storageAccounts/*",
+                            "Microsoft.ContainerInstance/containerGroups/*",
+                            "Microsoft.Resources/deployments/*",
+                            "Microsoft.Resources/deploymentScripts/*",
+                            "Microsoft.Chaos/*"
+                        ]
+                    }
+                ],
+                "assignableScopes": [
+                    "[resourceGroup().id]"
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.Resources/deploymentScripts",
+            "apiVersion": "2020-10-01",
+            "name": "[variables('waitroledefDeploymentScriptName')]",
+            "location": "[resourceGroup().location]",
+            "kind": "AzurePowerShell",
+            "dependsOn": [
+                "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('azcsTargetsDeploymentScriptIdentityName'))]",
+                "[resourceId('Microsoft.Authorization/roleDefinitions',variables('azcsTargetsDeploymentScriptRoleDefinitionName'))]"
+            ],
+            "properties": {
+                "forceUpdateTag": "[parameters('utcValue')]",
+                "azPowerShellVersion": "6.4",
+                "scriptContent": "Start-Sleep -Seconds 30",
+                "timeout": "PT10M",
+                "cleanupPreference": "Always",
+                "retentionInterval": "PT1H"
+            }
+        },
+        {
+            "type": "Microsoft.Authorization/roleAssignments",
+            "apiVersion": "2021-04-01-preview",
+            "name": "[variables('azcsTargetsDeploymentScriptRoleAssignmentName')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Resources/deploymentScripts', variables('waitroledefDeploymentScriptName'))]"
+            ],
+            "properties": {
+                "roleDefinitionId": "[resourceId('Microsoft.Authorization/roleDefinitions',variables('azcsTargetsDeploymentScriptRoleDefinitionName'))]",
+                "principalId": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('azcsTargetsDeploymentScriptIdentityName'))).principalId]",
+                "principalType": "ServicePrincipal"
+            }
+        },
+        {
+            "type": "Microsoft.Resources/deploymentScripts",
+            "apiVersion": "2020-10-01",
+            "name": "[variables('azcsTargetsDeploymentScriptName')]",
+            "location": "[resourceGroup().location]",
+            "kind": "AzurePowerShell",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('networkSecurityGroup_name'))]",
+                "[resourceId('Microsoft.Authorization/roleAssignments', variables('azcsTargetsDeploymentScriptRoleAssignmentName'))]"
+            ],
+            "identity": {
+                "type": "userAssigned",
+                "userAssignedIdentities": {
+                    "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('azcsTargetsDeploymentScriptIdentityName'))]": {}
+                }
+            },
+            "properties": {
+                "forceUpdateTag": "[parameters('utcValue')]",
+                "azPowerShellVersion": "6.4",
+                "environmentVariables": [],
+                "primaryScriptUri": "https://raw.githubusercontent.com/ThomVanL/blog-2021-11-azure-chaos-studio/arm-deploymentscripts/scripts/enable-chaos-targets/New-AzChaosTarget.ps1",
+                "arguments": "[format('-ResourceId \"{0}\" -TargetName \"{1}\" -CapabilityName \"{2}\"', resourceId('Microsoft.Network/networkSecurityGroups', parameters('networkSecurityGroup_name')), 'microsoft-networksecuritygroup', 'SecurityRule-1.0')]",
+                "timeout": "PT30M",
+                "cleanupPreference": "OnSuccess",
+                "retentionInterval": "PT60M"
+            }
         },
         {
             "type": "Microsoft.Chaos/experiments",
@@ -107,7 +187,7 @@
             "name": "[variables('experimentName')]",
             "location": "[resourceGroup().location]",
             "dependsOn": [
-                "[variables('networkSecurityGroupChaosTargetCapabilityResourceId')]"
+                "[variables('azcsTargetsDeploymentScriptName')]"
             ],
             "identity": {
                 "type": "SystemAssigned"
@@ -117,10 +197,10 @@
                 "selectors": [
                     {
                         "type": "List",
-                        "id": "[guid(variables('networkSecurityGroupChaosTargetResourceId'))]",
+                        "id": "[guid(reference(variables('azcsTargetsDeploymentScriptName')).outputs.chaosStudioTargetId)]",
                         "targets": [
                             {
-                                "id": "[variables('networkSecurityGroupChaosTargetResourceId')]",
+                                "id": "[reference(variables('azcsTargetsDeploymentScriptName')).outputs.chaosStudioTargetId]",
                                 "type": "ChaosTarget"
                             }
                         ]
@@ -135,7 +215,7 @@
                                 "actions": [
                                     {
                                         "type": "continuous",
-                                        "selectorId": "[guid(variables('networkSecurityGroupChaosTargetResourceId'))]",
+                                        "selectorId": "[guid(reference(variables('azcsTargetsDeploymentScriptName')).outputs.chaosStudioTargetId)]",
                                         "duration": "PT5M",
                                         "parameters": [
                                             {
@@ -346,7 +426,7 @@
                 },
                 "protectedSettings": {
                     "fileUris": [
-                        "https://raw.githubusercontent.com/ThomVanL/blog-2021-11-azure-chaos-studio/main/scripts/nginx-vm-setup/setup.sh"
+                        "https://raw.githubusercontent.com/ThomVanL/blog-2021-11-azure-chaos-studio/arm-deploymentscripts/scripts/nginx-vm-setup/setup.sh"
                     ],
                     "commandToExecute": "sh setup.sh",
                     "managedIdentity": {}

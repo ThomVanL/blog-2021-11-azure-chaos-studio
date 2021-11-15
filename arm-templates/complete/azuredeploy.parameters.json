@@ -28,6 +28,9 @@
         },
         "networkSecurityGroup_name": {
             "value": "tvl-azcs-nsg"
+        },
+        "utcValue": {
+            "value": "[utcNow()]"
         }
     }
 }
