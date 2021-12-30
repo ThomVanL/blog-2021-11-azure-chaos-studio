@@ -176,7 +176,7 @@
                         "managedDisk": {
                             "storageAccountType": "StandardSSD_LRS"
                         },
-                        "diskSizeGB": 30
+                        "diskSizeGB": 64
                     }
                 },
                 "osProfile": {
